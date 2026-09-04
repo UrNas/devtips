@@ -1,0 +1,8 @@
+{
+  "name": "review-crew",
+  "version": "1.0.0",
+  "description": "Five subagents, each with its own context window",
+  "author": { "name": "TubeForge", "url": "https://youtube.com/@TubeForgeHQ" },
+  "license": "MIT",
+  "keywords": ["claude-code", "tokens", "productivity"]
+}

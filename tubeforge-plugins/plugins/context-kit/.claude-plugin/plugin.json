@@ -1,0 +1,8 @@
+{
+  "name": "context-kit",
+  "version": "1.0.0",
+  "description": "Five MCP servers so Claude fetches context instead of you pasting it",
+  "author": { "name": "TubeForge", "url": "https://youtube.com/@TubeForgeHQ" },
+  "license": "MIT",
+  "keywords": ["claude-code", "tokens", "productivity"]
+}

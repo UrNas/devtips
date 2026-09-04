@@ -1,0 +1,8 @@
+{
+  "name": "skill-pack",
+  "version": "1.0.0",
+  "description": "Five skills loaded on relevance, not retyped",
+  "author": { "name": "TubeForge", "url": "https://youtube.com/@TubeForgeHQ" },
+  "license": "MIT",
+  "keywords": ["claude-code", "tokens", "productivity"]
+}

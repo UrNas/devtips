@@ -1,0 +1,8 @@
+{
+  "name": "token-guard",
+  "version": "1.0.0",
+  "description": "Hooks that fix Claude's output before it reaches you",
+  "author": { "name": "TubeForge", "url": "https://youtube.com/@TubeForgeHQ" },
+  "license": "MIT",
+  "keywords": ["claude-code", "tokens", "productivity"]
+}

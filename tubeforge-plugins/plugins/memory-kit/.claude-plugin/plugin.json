@@ -1,0 +1,8 @@
+{
+  "name": "memory-kit",
+  "version": "1.0.0",
+  "description": "Make a correction permanent with /remember",
+  "author": { "name": "TubeForge", "url": "https://youtube.com/@TubeForgeHQ" },
+  "license": "MIT",
+  "keywords": ["claude-code", "tokens", "productivity"]
+}

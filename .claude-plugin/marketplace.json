@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "tubeforge",
+  "version": "1.0.0",
+  "description": "The token-saving Claude Code setup from the TubeForge channel, as five installable plugins",
+  "owner": {
+    "name": "TubeForge",
+    "url": "https://youtube.com/@TubeForgeHQ"
+  },
+  "plugins": [
+    {
+      "name": "token-guard",
+      "description": "Hooks that format, lint-fix, type-check and test Claude's output before you see it",
+      "source": "./tubeforge-plugins/plugins/token-guard",
+      "category": "development"
+    },
+    {
+      "name": "context-kit",
+      "description": "Five MCP servers so Claude fetches context instead of you pasting it",
+      "source": "./tubeforge-plugins/plugins/context-kit",
+      "category": "development"
+    },
+    {
+      "name": "review-crew",
+      "description": "Five subagents with their own context windows: reviewer, tester, doc-writer, researcher, migrator",
+      "source": "./tubeforge-plugins/plugins/review-crew",
+      "category": "development"
+    },
+    {
+      "name": "skill-pack",
+      "description": "Five skills loaded on relevance instead of retyped every session",
+      "source": "./tubeforge-plugins/plugins/skill-pack",
+      "category": "development"
+    },
+    {
+      "name": "memory-kit",
+      "description": "A /remember command that writes corrections into the right CLAUDE.md",
+      "source": "./tubeforge-plugins/plugins/memory-kit",
+      "category": "development"
+    }
+  ]
+}
