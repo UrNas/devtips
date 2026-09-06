@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 77336,
+ "stop_reason": "end_turn",
+ "session_id": "4575a1df-5aef-41b7-99cb-8b0b61580536",
+ "total_cost_usd": 0.624758,
+ "usage": {
+  "input_tokens": 20,
+  "cache_creation_input_tokens": 31051,
+  "cache_read_input_tokens": 317864,
+  "output_tokens": 6170,
+  "output_tokens_details": {
+   "thinking_tokens": 2215
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 31051,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 1110,
+    "cache_read_input_tokens": 39876,
+    "cache_creation_input_tokens": 1185,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1185
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 906,
+   "outputTokens": 12,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.0009660000000000001,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 20,
+   "outputTokens": 6170,
+   "cacheReadInputTokens": 317864,
+   "cacheCreationInputTokens": 31051,
+   "webSearchRequests": 0,
+   "costUSD": 0.623792,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 2215,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 10,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "All 6 tests pass. \n\n## Cause\n\nSessions never expired because of a fail-open chain across four files \u2014 no single line was the whole bug:\n\n1. **`src/db/schema.sql:2`** \u2014 the `sessions` table had only `id` and `created_at`. No `expires_at` column existed to hold an expiry, and no `user_id` either, even though `createSession` was already inserting one.\n2. **`src/lib/session.ts:14`** \u2014 `createSession` inserted only `(id, user_id)` and returned `expiresAt: null`. The `defaultExpiry()` helper right below it was written but never called by anything.\n3. **`src/lib/session.ts:22`** \u2014 `isExpired` returned `false` when `expiresAt` was falsy. So a session with no expiry was treated as *valid forever*, which is exactly the state every session was in.\n4. **`src/middleware/auth.ts:10`** \u2014 `requireAuth` passed the raw DB row straight to `isExpired`. Rows are snake_case (`expires_at`), `Session` is camelCase (`expiresAt`), so `s.expiresAt` read `undefined` and hit the same fail-open branch. This one mattered independently: fixing only 1\u20133 would still have left auth passing an unmapped row and never expiring anything.\n\n## Fix\n\n- **`schema.sql`** \u2014 `sessions` now has `user_id uuid not null references users(id)` and `expires_at timestamptz not null`.\n- **`session.ts`** \u2014 `createSession` calls `defaultExpiry()` (1 day, via the `src/lib/time.ts` helpers per the time convention), writes `expires_at`, and returns it. Added `toSession(row)` + a `SessionRow` type to do the snake_case\u2192camelCase mapping in one place.\n- **`session.ts`** \u2014 `isExpired` now fails **closed**: no expiry means expired, so a missing or unreadable `expires_at` can never grant an unlimited session again.\n- **`auth.ts`** \u2014 maps the row through `toSession` before the expiry check, and returns the typed `Session`. No caller used the old return value (all 8 API modules just `await requireAuth(req)`), so the type change is safe.\n- **`src/lib/__tests__/session.test.ts`** \u2014 new, per the vitest/`__tests__` convention. Covers expiry population, all three `isExpired` branches including the fail-closed one, and both `toSession` mappings.\n\nOne thing to flag before this ships: `expires_at` is declared `not null`, but any rows already in a live `sessions` table have no value for it. A real deployment needs a migration that backfills existing rows (or adds the column nullable, backfills, then adds the constraint) \u2014 this repo has no migrations directory, so I amended the `CREATE TABLE` only. Related: the now-fail-closed `isExpired` means any session predating the fix will be rejected, so expect existing sessions to be logged out on deploy.",
+ "ttft_ms": 1617,
+ "type": "result",
+ "duration_ms": 79301,
+ "uuid": "70991348-af84-42b6-ae42-4e5fb60404b1",
+ "ttft_stream_ms": 859,
+ "time_to_request_ms": 43,
+ "first_content_frame_ms": 859,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "bloated-md",
+  "rep": 2,
+  "wall_s": 83
+ }
+}

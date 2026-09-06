@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 42369,
+ "stop_reason": "end_turn",
+ "session_id": "46d38086-3bd2-47f2-8021-1238aa300b58",
+ "total_cost_usd": 0.44287350000000003,
+ "usage": {
+  "input_tokens": 14,
+  "cache_creation_input_tokens": 25833,
+  "cache_read_input_tokens": 201675,
+  "output_tokens": 3307,
+  "output_tokens_details": {
+   "thinking_tokens": 809
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 25833,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 623,
+    "cache_read_input_tokens": 35597,
+    "cache_creation_input_tokens": 246,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 246
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 906,
+   "outputTokens": 11,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.000961,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 14,
+   "outputTokens": 3307,
+   "cacheReadInputTokens": 201675,
+   "cacheCreationInputTokens": 25833,
+   "webSearchRequests": 0,
+   "costUSD": 0.44191250000000004,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 809,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 7,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. Two bugs were compounding, either one alone was enough to make sessions immortal:\n\n1. **`src/lib/session.ts:14`** \u2014 `createSession` never wrote an expiry. It inserted only `(id, user_id)`, and `defaultExpiry()` was dead code. Every row landed with no `expires_at`.\n2. **`src/middleware/auth.ts:11`** \u2014 `requireAuth` passed the raw DB row straight to `isExpired`, which reads `s.expiresAt`. Postgres rows come back snake_case, so `session.expiresAt` was `undefined` and the old `if (!s.expiresAt) return false` guard short-circuited to \"not expired.\" Even backfilled `expires_at` values would have been ignored.\n\nChanges:\n\n- `createSession` now inserts `expires_at` from `defaultExpiry()` (24h) and returns it.\n- Added `rowToSession()` to map the snake_case row into a `Session` with a real `Date`; `requireAuth` uses it before the expiry check.\n- `Session.expiresAt` is now non-nullable `Date`, so `isExpired` is a straight comparison \u2014 the null branch that swallowed the check is gone.\n- `src/db/schema.sql:2` \u2014 the `sessions` table had neither `user_id` nor `expires_at`, so the original INSERT couldn't have worked against this schema. Added both (`user_id` FK to `users`, `expires_at timestamptz not null`).\n\nAdded `src/lib/__tests__/session.test.ts` per the repo convention; 3 tests pass under vitest.\n\nOne thing I did not do: existing session rows predate the `expires_at NOT NULL` column, so this schema change needs a migration that backfills them (e.g. `created_at + 1 day`) before the constraint applies. There's no migrations directory in the repo, so I left that for you to place where it belongs.",
+ "ttft_ms": 3030,
+ "type": "result",
+ "duration_ms": 45674,
+ "uuid": "770b8629-aac9-4909-a0ee-ac9b7badbd00",
+ "ttft_stream_ms": 942,
+ "time_to_request_ms": 34,
+ "first_content_frame_ms": 1589,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "short-md",
+  "rep": 3,
+  "wall_s": 49
+ }
+}

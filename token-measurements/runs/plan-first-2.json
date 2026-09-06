@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 88694,
+ "stop_reason": "end_turn",
+ "session_id": "9289d0b1-bd58-4ab2-bd7a-cd305a53e2be",
+ "total_cost_usd": 0.7736445,
+ "usage": {
+  "input_tokens": 30,
+  "cache_creation_input_tokens": 33420,
+  "cache_read_input_tokens": 541901,
+  "output_tokens": 6694,
+  "output_tokens_details": {
+   "thinking_tokens": 1223
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 33420,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 801,
+    "cache_read_input_tokens": 43181,
+    "cache_creation_input_tokens": 249,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 249
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 939,
+   "outputTokens": 11,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.0009939999999999999,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 30,
+   "outputTokens": 6694,
+   "cacheReadInputTokens": 541901,
+   "cacheCreationInputTokens": 33420,
+   "webSearchRequests": 0,
+   "costUSD": 0.7726504999999999,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 1223,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 19,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. The cause was three defects chained on one path, in `measure-data/work/plan-first-2`:\n\n1. **`src/db/schema.sql:2`** \u2014 the `sessions` table was `(id, created_at)` only. No `user_id`, no `expires_at`. `createSession` was inserting into columns that didn't exist, so there was nowhere for an expiry to live.\n2. **`src/lib/session.ts:14`** \u2014 `createSession` never wrote an expiry and returned `expiresAt: null`, and `isExpired` returned `false` on a null expiry. Every session was permanently valid by construction.\n3. **`src/middleware/auth.ts:11`** \u2014 the real reason a schema-only fix wouldn't have worked: `requireAuth` passed the raw driver row into `isExpired`, which reads camelCase `expiresAt` while the row carries snake_case `expires_at`. That read `undefined` regardless of what the column held.\n\nChanges: added `user_id`/`expires_at` to the table; `createSession` now writes `defaultExpiry()` (24h) and `Session.expiresAt` is a non-nullable `Date`; added `rowToSession` to map driver rows; `isExpired` now fails closed on a missing or unparseable expiry; `requireAuth` maps before checking and rejects a missing row explicitly.\n\nVerified by compiling the fixture with tsc 5.9.3 (clean, no type errors) and running it: fresh session accepted, stale rejected end-to-end through `requireAuth`, null-expiry legacy row treated as expired. `auth.ts` is the only consumer of these symbols, so nothing else moves. Scratch files removed; the fixture is untracked, so nothing is staged or committed.\n\nTwo things to note before this ships anywhere real:\n\n- **Fail-closed invalidates existing sessions.** Every row currently in the table has no usable expiry, so all logged-in users are forced to re-auth on deploy. That's the security-correct default for an auth check, but it's a visible logout event \u2014 if you'd rather not take it, the alternative is a one-time backfill of `expires_at` before rolling out.\n- **The schema edit is a `CREATE TABLE`, not a migration.** It only applies to a fresh database. A live table needs `ALTER TABLE sessions ADD COLUMN ...`, and the `not null` on `expires_at` can't be added until existing rows are backfilled.",
+ "ttft_ms": 2327,
+ "type": "result",
+ "duration_ms": 90661,
+ "uuid": "e27f1658-d7f5-41cf-8214-091c1ddbf4bf",
+ "ttft_stream_ms": 931,
+ "time_to_request_ms": 49,
+ "first_content_frame_ms": 931,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "plan-first",
+  "rep": 2,
+  "wall_s": 94
+ }
+}

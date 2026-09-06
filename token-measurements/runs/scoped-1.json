@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 60721,
+ "stop_reason": "end_turn",
+ "session_id": "b43fb58b-f83e-4164-9897-ec3ad58f1e93",
+ "total_cost_usd": 0.501178,
+ "usage": {
+  "input_tokens": 16,
+  "cache_creation_input_tokens": 29131,
+  "cache_read_input_tokens": 242742,
+  "output_tokens": 3497,
+  "output_tokens_details": {
+   "thinking_tokens": 976
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 29131,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 789,
+    "cache_read_input_tokens": 38492,
+    "cache_creation_input_tokens": 649,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 649
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 932,
+   "outputTokens": 12,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.000992,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 16,
+   "outputTokens": 3497,
+   "cacheReadInputTokens": 242742,
+   "cacheCreationInputTokens": 29131,
+   "webSearchRequests": 0,
+   "costUSD": 0.500186,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 976,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 8,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. There were two defects on the expiry path, and fixing only the first would have left sessions still immortal.\n\n**1. Expiry was never written** \u2014 `src/lib/session.ts:14`\n\n`createSession` inserted only `(id, user_id)` and returned `expiresAt: null`. `defaultExpiry()` existed but had no callers. Since `isExpired` bailed out with `if (!s.expiresAt) return false`, every session was permanent by construction.\n\nNow the insert includes `expires_at`, populated from `defaultExpiry()` (24h).\n\n**2. The check read a field that never exists on a DB row** \u2014 `src/middleware/auth.ts:10`\n\n`requireAuth` passed the raw driver row straight into `isExpired`. Rows are snake_cased (`expires_at`), so `s.expiresAt` was `undefined` on *every* row regardless of what's stored \u2014 the same early-return, hit a second way. Added `fromRow()` in `session.ts` to map row \u2192 `Session` before the check.\n\n`Session.expiresAt` is now non-nullable and `fromRow` returns `null` for a row missing `expires_at`, so `requireAuth` fails closed. That's a deliberate behavior choice worth flagging: any pre-existing session rows written before this fix will be rejected rather than honored, forcing re-login. The alternative \u2014 treating them as valid \u2014 preserves exactly the bug you asked me to fix.\n\n**3. Schema** \u2014 `src/db/schema.sql:2`\n\nThe `sessions` table had neither `user_id` nor `expires_at`, so the insert couldn't have persisted. Added both (`expires_at timestamptz not null`, `user_id` FK to `users`).\n\nTwo things to note: the fixture has no tsconfig, tests, or dependencies (`db/client.ts` is a stub returning `{ rows: [] }`), so I could not typecheck or run this \u2014 the fix is verified by reading the call path only. And the schema change is a bare `CREATE TABLE` edit with no migration; if this repo has a real migration flow elsewhere, the column needs one, plus a backfill decision for existing rows given the fail-closed behavior above.",
+ "ttft_ms": 3078,
+ "type": "result",
+ "duration_ms": 60431,
+ "uuid": "117bfa30-566c-4246-a566-68e47ca9c580",
+ "ttft_stream_ms": 2068,
+ "time_to_request_ms": 34,
+ "first_content_frame_ms": 2069,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "scoped",
+  "rep": 1,
+  "wall_s": 64
+ }
+}

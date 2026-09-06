@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 74945,
+ "stop_reason": "end_turn",
+ "session_id": "a234a4ab-7108-45fc-acce-1f0bbd7cd9a1",
+ "total_cost_usd": 0.614219,
+ "usage": {
+  "input_tokens": 22,
+  "cache_creation_input_tokens": 29481,
+  "cache_read_input_tokens": 350876,
+  "output_tokens": 5716,
+  "output_tokens_details": {
+   "thinking_tokens": 2138
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 29481,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 1080,
+    "cache_read_input_tokens": 38575,
+    "cache_creation_input_tokens": 916,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 916
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 906,
+   "outputTokens": 11,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.000961,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 22,
+   "outputTokens": 5716,
+   "cacheReadInputTokens": 350876,
+   "cacheCreationInputTokens": 29481,
+   "webSearchRequests": 0,
+   "costUSD": 0.613258,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 2138,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 14,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. The cause was a four-link chain \u2014 every link had to break for sessions to expire, so fixing any one alone would have left them immortal.\n\n**The chain**\n\n1. `src/db/schema.sql:2` \u2014 the `sessions` table had only `id` and `created_at`. No `expires_at`, and no `user_id` either, so `createSession`'s INSERT referenced a column that didn't exist.\n2. `src/lib/session.ts:14` \u2014 `createSession` inserted no expiry and returned `expiresAt: null`.\n3. `src/lib/session.ts:22` \u2014 `isExpired` failed **open**: `if (!s.expiresAt) return false`. A session with no expiry was treated as valid forever.\n4. `src/middleware/auth.ts:11` \u2014 the enforcement point passed the raw DB row straight to `isExpired`. Rows are snake_cased (`expires_at`) with a string timestamp, so `s.expiresAt` was `undefined` there no matter what the DB held, and `.getTime()` would have thrown on a string even after a rename.\n\n**The fix**\n\n- `schema.sql` \u2014 `sessions` now carries `user_id uuid not null references users(id)` and `expires_at timestamptz not null`.\n- `createSession` \u2014 computes `defaultExpiry()` (24h, the already-present but unused helper), writes it, and returns it. `Session.expiresAt` is now `Date`, not `Date | null`.\n- `isExpired` \u2014 fails **closed**: a missing or unparseable expiry counts as expired.\n- New `rowToSession(row)` maps snake_case \u2192 camelCase and coerces the timestamp to a `Date`; `requireAuth` goes through it, and rejects a missing row before mapping.\n\n**Verification** \u2014 I could not execute anything here: no TypeScript compiler, no test runner, no dependencies in `package.json`, and `src/db/client.ts` is a stub that returns `{ rows: [] }` regardless of query. This is checked by reading and by grepping every reference to the expiry symbols; nothing else in `src/` touches them, and `createSession` is the only session-creation path.\n\nOne thing for you to decide: `expires_at` and `user_id` are `NOT NULL` on a table that presumably already has rows in any deployed environment. There's no migrations directory in this repo, only `schema.sql`, so I didn't write one \u2014 applying this to a live database needs a backfill (or an interim nullable column) first. Existing sessions have no expiry to backfill from, so the practical answer is likely to invalidate them all and force re-auth.",
+ "ttft_ms": 4495,
+ "type": "result",
+ "duration_ms": 75299,
+ "uuid": "412d4a61-ba94-4bff-94ba-02d6e885573d",
+ "ttft_stream_ms": 937,
+ "time_to_request_ms": 58,
+ "first_content_frame_ms": 1690,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "baseline",
+  "rep": 1,
+  "wall_s": 79
+ }
+}

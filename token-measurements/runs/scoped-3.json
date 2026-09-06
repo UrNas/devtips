@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 48458,
+ "stop_reason": "end_turn",
+ "session_id": "89657214-4f85-405c-8384-6758ea0c4875",
+ "total_cost_usd": 0.45932400000000007,
+ "usage": {
+  "input_tokens": 14,
+  "cache_creation_input_tokens": 27254,
+  "cache_read_input_tokens": 199354,
+  "output_tokens": 3442,
+  "output_tokens_details": {
+   "thinking_tokens": 1020
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 27254,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 817,
+    "cache_read_input_tokens": 36391,
+    "cache_creation_input_tokens": 873,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 873
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 932,
+   "outputTokens": 11,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.000987,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 14,
+   "outputTokens": 3442,
+   "cacheReadInputTokens": 199354,
+   "cacheCreationInputTokens": 27254,
+   "webSearchRequests": 0,
+   "costUSD": 0.458337,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 1020,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 8,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. The cause was a chain of three defects on the expiry path \u2014 `src/lib/session.ts:12` had the comment marking the first one, but fixing it alone wouldn't have worked.\n\n**1. Expiry was never written** (`src/lib/session.ts`)\n`createSession` inserted only `(id, user_id)` and returned `expiresAt: null`. `defaultExpiry()` existed but nothing called it. Now it computes `defaultExpiry()` (24h), persists it in the INSERT, and returns it.\n\n**2. `isExpired` failed open** (`src/lib/session.ts:22`)\n`if (!s.expiresAt) return false` meant \"no expiry \u21d2 eternal\". Now a missing or unparseable `expiresAt` is treated as expired (fail closed), so this class of bug can't silently reappear. `expiresAt` is also non-nullable in the `Session` type.\n\n**3. The auth middleware never saw the field anyway** (`src/middleware/auth.ts:11`)\nIt passed the raw `SELECT *` row straight to `isExpired`. DB columns are snake_case, so `row.expiresAt` was `undefined` regardless of what's in `expires_at` \u2014 every session read back as unexpired even after fix #1. Added `rowToSession()` to map the row, and the middleware now maps before checking.\n\n**Schema** (`src/db/schema.sql:2`) \u2014 the `sessions` table had neither `user_id` nor `expires_at`; the INSERT would have failed. Added both as `not null`.\n\nTwo things to flag:\n\n- **Fail-closed is a behavior change.** Any existing session row with a null `expires_at` now gets rejected instead of accepted forever. That's the correct security posture, but it logs those sessions out. If you have live data, backfill `expires_at` before deploying \u2014 and the `not null` schema change needs a backfill in the same migration anyway.\n- **I could not run anything.** `package.json` is a bare stub with no dependencies, no test script, and no TypeScript toolchain, and `db.query` is a stub returning `{ rows: [] }`. The fix is unverified by execution \u2014 I only confirmed by grep that every `requireAuth` caller discards the return value, so the `Session` shape change breaks nothing downstream.",
+ "ttft_ms": 5722,
+ "type": "result",
+ "duration_ms": 48449,
+ "uuid": "7b90ff3d-ae8a-4031-b994-45606cec7085",
+ "ttft_stream_ms": 2832,
+ "time_to_request_ms": 34,
+ "first_content_frame_ms": 3611,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "scoped",
+  "rep": 3,
+  "wall_s": 52
+ }
+}

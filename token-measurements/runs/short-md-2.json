@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 94453,
+ "stop_reason": "end_turn",
+ "session_id": "10bba025-cb65-491f-89f9-bd07e5fe8dfc",
+ "total_cost_usd": 0.7061109999999999,
+ "usage": {
+  "input_tokens": 24,
+  "cache_creation_input_tokens": 31469,
+  "cache_read_input_tokens": 399720,
+  "output_tokens": 7619,
+  "output_tokens_details": {
+   "thinking_tokens": 2171
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 31469,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 885,
+    "cache_read_input_tokens": 41316,
+    "cache_creation_input_tokens": 163,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 163
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 906,
+   "outputTokens": 12,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.0009660000000000001,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 24,
+   "outputTokens": 7619,
+   "cacheReadInputTokens": 399720,
+   "cacheCreationInputTokens": 31469,
+   "webSearchRequests": 0,
+   "costUSD": 0.705145,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 2171,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 12,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. There were **three** independent reasons a session could never expire \u2014 fixing only the obvious one would have left the bug live.\n\n**1. The column didn't exist** \u2014 `src/db/schema.sql:2`\n```sql\nCREATE TABLE sessions (id uuid primary key, created_at timestamptz default now());\n```\nNo `user_id`, no `expires_at`. The `INSERT` in `createSession` referenced `user_id`, a column the schema never declared. Added both columns, with `expires_at timestamptz not null` so the database itself refuses an unexpiring session.\n\n**2. `createSession` never stamped an expiry** \u2014 `src/lib/session.ts:14`\n`defaultExpiry()` existed but was dead code \u2014 nothing called it. The insert wrote only `(id, user_id)` and returned `expiresAt: null`. It now computes `defaultExpiry()` (24h via the `time.ts` helpers), writes it, and returns it.\n\n**3. `requireAuth` handed `isExpired` a shape it can't read** \u2014 `src/middleware/auth.ts:10`\nThis is the one that would have survived a fix to #2. `SELECT *` returns a raw Postgres row with snake_case `expires_at`; `isExpired` reads `s.expiresAt`, which on that row is `undefined` \u2192 `!s.expiresAt` \u2192 `return false`. Every session passes auth regardless of what's in the column. Added a `toSession(row)` mapper and routed `requireAuth` through it.\n\nI also flipped `isExpired` to fail closed: a session with no expiry is now treated as expired rather than eternal. Combined with the `not null` constraint, an unexpiring session can't be created *or* honored.\n\n**Verification:** I extracted the logic into plain JS and ran it \u2014 missing expiry \u2192 expired, past expiry \u2192 expired, fresh session \u2192 valid with a `+24h` timestamp, snake_case row \u2192 correctly mapped and not expired. The insert now names all three columns.\n\n**One thing I couldn't run:** I added `src/lib/__tests__/session.test.ts` covering all four cases, per the vitest convention in CLAUDE.md \u2014 but this repo has no `package.json` dependencies and no `node_modules`, so vitest isn't installed and the suite has never been executed. Run `pnpm add -D vitest && pnpm vitest` to confirm it passes in a real environment.\n\n`requireAuth`'s return type changed from a raw row to a camelCase `Session`. I checked all nine `src/api/*` callers \u2014 every one does bare `await requireAuth(req)` and discards the result, so nothing downstream breaks.",
+ "ttft_ms": 3350,
+ "type": "result",
+ "duration_ms": 94760,
+ "uuid": "a5730619-a0a1-4db7-b7cc-c3d76e6a1abb",
+ "ttft_stream_ms": 1041,
+ "time_to_request_ms": 41,
+ "first_content_frame_ms": 1906,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "short-md",
+  "rep": 2,
+  "wall_s": 98
+ }
+}

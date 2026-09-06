@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 53169,
+ "stop_reason": "end_turn",
+ "session_id": "ec4fdb4e-fe79-46c3-a9ce-280f7cc705eb",
+ "total_cost_usd": 0.5627,
+ "usage": {
+  "input_tokens": 20,
+  "cache_creation_input_tokens": 30082,
+  "cache_read_input_tokens": 321336,
+  "output_tokens": 4005,
+  "output_tokens_details": {
+   "thinking_tokens": 1022
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 30082,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 841,
+    "cache_read_input_tokens": 39673,
+    "cache_creation_input_tokens": 419,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 419
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 932,
+   "outputTokens": 11,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.000987,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 20,
+   "outputTokens": 4005,
+   "cacheReadInputTokens": 321336,
+   "cacheCreationInputTokens": 30082,
+   "webSearchRequests": 0,
+   "costUSD": 0.5617129999999999,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 1022,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 10,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. The cause was three defects in the session path, each of which alone kept sessions alive forever:\n\n**1. Expiry was never written** \u2014 `src/lib/session.ts:15` inserted only `(id, user_id)`. `defaultExpiry()` existed but was dead code, and the returned `Session` hardcoded `expiresAt: null`.\n\n**2. `isExpired` failed open** \u2014 `if (!s.expiresAt) return false` treated \"no expiry recorded\" as \"valid forever\", the wrong default for an auth check.\n\n**3. `requireAuth` compared the wrong field** \u2014 `src/middleware/auth.ts:11` passed the raw Postgres row straight to `isExpired`. Rows carry snake_case `expires_at`, so `s.expiresAt` was `undefined` on every request regardless of what the DB held. This one would have survived a fix to #1 and #2 alone.\n\nChanges:\n\n- `src/lib/session.ts` \u2014 `createSession` now writes `expires_at` using `defaultExpiry()` (24h). `Session.expiresAt` is now non-nullable `Date`, so \"session with no expiry\" is unrepresentable. Added `rowToSession()` to map the DB row, returning `null` when `expires_at` is missing \u2014 pre-expiry rows fail closed instead of authenticating. `isExpired` is now a plain timestamp comparison.\n- `src/middleware/auth.ts` \u2014 maps the row through `rowToSession()` before the check; a null mapping is rejected alongside expired sessions.\n- `src/db/schema.sql` \u2014 the `sessions` table had neither `user_id` nor `expires_at`, so the insert referenced columns that don't exist. Added both, with `expires_at timestamptz not null` to keep the invariant at the DB level.\n\nTwo things to flag:\n\n- **I could not verify this by running anything.** `package.json` has no dependencies, scripts, or test runner, there's no `node_modules`, and `tsc` isn't on PATH. The changes are reviewed by eye only.\n- **Existing rows need a backfill.** Adding `expires_at timestamptz not null` won't apply to a live table, and under the new code every currently-issued session maps to `null` and is rejected \u2014 logging out all active users. If this schema is already deployed, the migration wants `ADD COLUMN expires_at timestamptz`, a backfill (e.g. `created_at + interval '1 day'`), then `SET NOT NULL`. I left that decision to you rather than guessing at a migration story the repo doesn't otherwise have.",
+ "ttft_ms": 1638,
+ "type": "result",
+ "duration_ms": 53445,
+ "uuid": "7b01c876-0182-43fd-8162-46ffb0cbc0c7",
+ "ttft_stream_ms": 890,
+ "time_to_request_ms": 32,
+ "first_content_frame_ms": 890,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "scoped",
+  "rep": 2,
+  "wall_s": 57
+ }
+}

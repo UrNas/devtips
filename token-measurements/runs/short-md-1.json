@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 61111,
+ "stop_reason": "end_turn",
+ "session_id": "24bd6348-641b-4343-aa1f-985dfd775909",
+ "total_cost_usd": 0.5251840000000001,
+ "usage": {
+  "input_tokens": 18,
+  "cache_creation_input_tokens": 27589,
+  "cache_read_input_tokens": 269236,
+  "output_tokens": 4545,
+  "output_tokens_details": {
+   "thinking_tokens": 1140
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 27589,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 951,
+    "cache_read_input_tokens": 36706,
+    "cache_creation_input_tokens": 893,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 893
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 906,
+   "outputTokens": 11,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.000961,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 18,
+   "outputTokens": 4545,
+   "cacheReadInputTokens": 269236,
+   "cacheCreationInputTokens": 27589,
+   "webSearchRequests": 0,
+   "costUSD": 0.524223,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 1140,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 9,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. Sessions never expired because of a four-link chain, each of which alone was sufficient:\n\n**1. `src/lib/session.ts:14` \u2014 expiry was never written.** `createSession` inserted only `(id, user_id)` and returned `expiresAt: null`. `defaultExpiry()` existed but was dead code. Now inserts `expires_at` and returns it.\n\n**2. `src/lib/session.ts:22` \u2014 the check failed open.** `if (!s.expiresAt) return false` meant \"no expiry recorded\" was read as \"valid\". Flipped to fail closed, so any legacy row with a NULL expiry stops authenticating instead of living forever.\n\n**3. `src/middleware/auth.ts:11` \u2014 the raw DB row was passed straight to `isExpired`.** The row has `expires_at` (snake_case, and a string from most drivers), but `isExpired` reads `s.expiresAt`, so it saw `undefined` on every request. This one would have kept sessions immortal *even after* fixing #1. Added `rowToSession()` to normalize the column name and coerce string timestamps to `Date`.\n\n**4. `src/db/schema.sql:2` \u2014 the table had neither column.** `sessions` was only `(id, created_at)`, so the insert in #1 had nowhere to land. Added `user_id uuid not null references users(id)` and `expires_at timestamptz not null`.\n\nTests in `src/lib/__tests__/session.test.ts` per the vitest convention \u2014 5 passed, covering the fail-closed null case, both sides of the boundary, and the snake_case/string-timestamp mapping.\n\nTwo things to flag:\n\n- **You need a migration for existing rows.** `expires_at` is `not null`, but live `sessions` rows predate the column. Backfill before applying \u2014 either give existing rows an expiry (`ALTER TABLE sessions ADD COLUMN expires_at timestamptz; UPDATE sessions SET expires_at = now() + interval '1 day'; ALTER TABLE ... SET NOT NULL`) or delete them and force re-login. Combined with fix #2, deploying without a backfill logs out every current session. `user_id` has the same problem and no sensible default, which argues for clearing the table.\n- `package.json` lists no dependencies; vitest resolved from a parent `node_modules`. If this package is meant to stand alone, it needs `vitest` as a devDependency \u2014 I didn't add it, since that means touching the lockfile with pnpm.",
+ "ttft_ms": 1802,
+ "type": "result",
+ "duration_ms": 63825,
+ "uuid": "bf6a084f-37ea-4db8-b91c-c889a0056632",
+ "ttft_stream_ms": 955,
+ "time_to_request_ms": 39,
+ "first_content_frame_ms": 955,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "short-md",
+  "rep": 1,
+  "wall_s": 68
+ }
+}

@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 47331,
+ "stop_reason": "end_turn",
+ "session_id": "71df571c-2711-4a56-ac23-bab15da6cb9d",
+ "total_cost_usd": 0.4754194999999999,
+ "usage": {
+  "input_tokens": 14,
+  "cache_creation_input_tokens": 28119,
+  "cache_read_input_tokens": 208837,
+  "output_tokens": 3551,
+  "output_tokens_details": {
+   "thinking_tokens": 697
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 28119,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 774,
+    "cache_read_input_tokens": 37739,
+    "cache_creation_input_tokens": 390,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 390
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 906,
+   "outputTokens": 12,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.0009660000000000001,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 14,
+   "outputTokens": 3551,
+   "cacheReadInputTokens": 208837,
+   "cacheCreationInputTokens": 28119,
+   "webSearchRequests": 0,
+   "costUSD": 0.4744534999999999,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 697,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 9,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Sessions never expired because of three defects that compounded \u2014 fixing only one wouldn't have helped.\n\n**1. Expiry was never written** (`src/lib/session.ts:14`)\n`createSession` inserted only `(id, user_id)`. Now it computes `defaultExpiry()` (24h, via the `src/lib/time.ts` helpers) and stores it.\n\n**2. `isExpired` failed open** (`src/lib/session.ts:22`)\n`if (!s.expiresAt) return false` meant a session with no expiry was treated as valid forever. It now fails closed \u2014 a missing or unparseable expiry counts as expired.\n\n**3. The auth check read a field that didn't exist** (`src/middleware/auth.ts:11`)\nThis is the one that would have kept the bug alive after fixing #1. `requireAuth` passed the raw `SELECT *` row straight into `isExpired`, but DB rows are snake_case (`expires_at`) with a string timestamp, while `isExpired` reads `expiresAt` \u2014 always `undefined`, always false. Added a `rowToSession` mapper and routed the row through it; the missing-row case now throws explicitly since the mapper needs a row.\n\n**4. Schema** (`src/db/schema.sql:2`)\nThe `sessions` table had neither `user_id` nor `expires_at` \u2014 the insert in #1 would have failed against it. Added both (`user_id` FK to `users`, `expires_at` not-null).\n\nTwo things to flag:\n\n- **This needs a migration, not just a schema edit.** Existing rows have no `expires_at`, and the column is `not null`. You'll want a backfill (e.g. `created_at + interval '1 day'`) before the constraint applies \u2014 and be aware that with the fail-closed change, every pre-existing session becomes invalid on deploy, so users get logged out once.\n- **No tests added.** `CLAUDE.md` specifies vitest in `__tests__/` beside the source, but there's no vitest dependency, no test script, and no existing `__tests__` anywhere in the repo \u2014 and `src/db/client.ts` is a stub returning `{ rows: [] }`, so there's nothing to test against yet. Say the word and I'll add vitest plus `src/lib/__tests__/session.test.ts` covering the expired/\u672aexpired/missing-expiry cases against a faked clock.",
+ "ttft_ms": 1460,
+ "type": "result",
+ "duration_ms": 46558,
+ "uuid": "0d6a27ca-7032-4cee-93f2-54cfdaadb041",
+ "ttft_stream_ms": 951,
+ "time_to_request_ms": 31,
+ "first_content_frame_ms": 951,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "bloated-md",
+  "rep": 3,
+  "wall_s": 49
+ }
+}

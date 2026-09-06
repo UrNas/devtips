@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 101672,
+ "stop_reason": "end_turn",
+ "session_id": "171b2b2c-fe06-4317-9126-3447c3a1770e",
+ "total_cost_usd": 0.7984769999999999,
+ "usage": {
+  "input_tokens": 30,
+  "cache_creation_input_tokens": 33821,
+  "cache_read_input_tokens": 535386,
+  "output_tokens": 7657,
+  "output_tokens_details": {
+   "thinking_tokens": 1722
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 33821,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 811,
+    "cache_read_input_tokens": 43038,
+    "cache_creation_input_tokens": 793,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 793
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 939,
+   "outputTokens": 12,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.0009989999999999999,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 30,
+   "outputTokens": 7657,
+   "cacheReadInputTokens": 535386,
+   "cacheCreationInputTokens": 33821,
+   "webSearchRequests": 0,
+   "costUSD": 0.7974779999999999,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 1722,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 17,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. There were three separate reasons a session could never expire; fixing only the commented one would not have changed behavior.\n\n**`src/db/schema.sql`** \u2014 `sessions` was `(id, created_at)` only. The existing INSERT wrote `user_id`, a column that didn't exist, and there was nowhere to put an expiry. Added `user_id uuid not null` and `expires_at timestamptz not null`, plus an index on `expires_at` and a commented backfill migration for databases already created.\n\n**`src/lib/session.ts`** \u2014 `createSession` now computes `defaultExpiry()` (24h), writes it in the INSERT, and returns it instead of `null`. `isExpired` now fails closed: a missing expiry means we can't prove the session is valid, so it's treated as expired rather than immortal. Added `rowToSession` to normalize DB rows.\n\n**`src/middleware/auth.ts`** \u2014 this was the hidden second cause. `requireAuth` passed the raw DB row straight to `isExpired`, which reads `.expiresAt`; the row has `expires_at`. So even with the expiry stored correctly, the check read `undefined` and returned `false` on every request. It now maps through `rowToSession` first, and the null-row case is checked separately so a missing session isn't relying on the expiry branch.\n\nVerified by transpiling the module to JS and running it: fresh row \u2192 not expired, past row \u2192 expired, legacy null row \u2192 expired, `createSession` yields a 24h expiry, unknown token \u2192 rejected.\n\nTwo things to know before this ships:\n\n- **`isExpired` now fails closed.** Any pre-existing `sessions` row has no `expires_at`, so those sessions are rejected on the next request \u2014 a forced logout for everyone currently signed in. The commented `UPDATE ... SET expires_at = created_at + interval '1 day'` in the schema file avoids that; run it as part of the same deploy or accept the logout.\n- I did not add session refresh or sliding renewal. With a hard 24h expiry and no renewal path, active users get logged out daily. If you want a sliding window, that's a follow-up in `requireAuth` (bump `expires_at` on use) \u2014 say the word and I'll add it.\n\n`src/api/sessions.ts` needed no change; it returns raw rows and never consults expiry. The `db` client is a stub that always returns `rows: []`, so `requireAuth` rejects everything at runtime in this fixture \u2014 that's the stub, not the fix.",
+ "ttft_ms": 3781,
+ "type": "result",
+ "duration_ms": 103499,
+ "uuid": "54f2638e-459f-485e-b38e-3a02d701b770",
+ "ttft_stream_ms": 860,
+ "time_to_request_ms": 28,
+ "first_content_frame_ms": 1591,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "plan-first",
+  "rep": 1,
+  "wall_s": 107
+ }
+}

@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 53780,
+ "stop_reason": "end_turn",
+ "session_id": "a464e4f8-38b0-4598-b644-ea3fdc6f20c6",
+ "total_cost_usd": 0.5081305,
+ "usage": {
+  "input_tokens": 18,
+  "cache_creation_input_tokens": 26932,
+  "cache_read_input_tokens": 268669,
+  "output_tokens": 4137,
+  "output_tokens_details": {
+   "thinking_tokens": 920
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 26932,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 707,
+    "cache_read_input_tokens": 36275,
+    "cache_creation_input_tokens": 667,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 667
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 906,
+   "outputTokens": 11,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.000961,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 18,
+   "outputTokens": 4137,
+   "cacheReadInputTokens": 268669,
+   "cacheCreationInputTokens": 26932,
+   "webSearchRequests": 0,
+   "costUSD": 0.5071695,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 920,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 9,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Sessions never expired because of three defects stacked on top of each other \u2014 fixing only the first would not have changed the behavior.\n\n**1. Expiry was never written** \u2014 `src/lib/session.ts:14`\n\n`createSession` inserted only `(id, user_id)` and returned `expiresAt: null`. `defaultExpiry()` existed but nothing called it. Now the insert writes `expires_at` from `defaultExpiry()` (24h).\n\n**2. The auth check read a field that never existed** \u2014 `src/middleware/auth.ts:11`\n\n`requireAuth` passed the raw `SELECT *` row straight to `isExpired`. DB rows are snake_case (`expires_at`, a timestamp string); `isExpired` reads `s.expiresAt`, which was always `undefined` on that row. So even with #1 fixed, every session would still have looked unexpired. Added `rowToSession()` in `src/lib/session.ts` to map the row (and parse the timestamp into a `Date`), and `requireAuth` now goes through it.\n\n**3. `isExpired` failed open** \u2014 `src/lib/session.ts:32`\n\n`if (!s.expiresAt) return false` meant \"no expiry \u21d2 valid forever\" \u2014 it turned both bugs above into permanent sessions instead of errors. Flipped to fail closed: a session with no expiry is treated as expired.\n\nAlso fixed `src/db/schema.sql:2` \u2014 the `sessions` table had neither `user_id` nor `expires_at`, so the original `INSERT` referenced a non-existent column. Both are now declared `not null`, which makes defect #1 fail loudly rather than silently if it recurs.\n\nVerification: the repo has no TypeScript or test deps installed (`package.json` has no dependencies and no `tsc`), so I couldn't typecheck or run a suite. I ported the changed logic to plain JS and exercised it \u2014 fresh session not expired, past session expired, null expiry expired, snake_case row maps to a real `Date` \u2014 all four pass. The DB layer in `src/db/client.ts` is a stub that returns `{ rows: [] }`, so the insert path itself is not executable here.",
+ "ttft_ms": 3183,
+ "type": "result",
+ "duration_ms": 55253,
+ "uuid": "6252779d-1a4b-4a5f-84af-59605036806a",
+ "ttft_stream_ms": 902,
+ "time_to_request_ms": 32,
+ "first_content_frame_ms": 1690,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "baseline",
+  "rep": 3,
+  "wall_s": 59
+ }
+}

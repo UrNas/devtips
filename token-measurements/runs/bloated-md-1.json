@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 113302,
+ "stop_reason": "end_turn",
+ "session_id": "c7624b48-23bf-4dbf-bc3a-0f6bdad3c85d",
+ "total_cost_usd": 0.9441585,
+ "usage": {
+  "input_tokens": 38,
+  "cache_creation_input_tokens": 36750,
+  "cache_read_input_tokens": 718655,
+  "output_tokens": 8647,
+  "output_tokens_details": {
+   "thinking_tokens": 2955
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 36750,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 1061,
+    "cache_read_input_tokens": 45751,
+    "cache_creation_input_tokens": 1009,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1009
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 906,
+   "outputTokens": 12,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.0009660000000000001,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 38,
+   "outputTokens": 8647,
+   "cacheReadInputTokens": 718655,
+   "cacheCreationInputTokens": 36750,
+   "webSearchRequests": 0,
+   "costUSD": 0.9431925,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 2955,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 20,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. There were **three** independent defects on the auth path, each of which alone was enough to make sessions immortal:\n\n**1. `createSession` never wrote an expiry** (`src/lib/session.ts:14`) \u2014 the INSERT only set `id` and `user_id`, so `expiresAt` was always `null`. `defaultExpiry()` existed but was dead code, never called. Now `createSession` calls it and persists `expires_at`.\n\n**2. `isExpired` failed open on a missing expiry** (`src/lib/session.ts:22`) \u2014 `if (!s.expiresAt) return false` meant \"no expiry recorded\" was read as \"still valid.\" Now it returns `true`: a session with no expiry predates expiry tracking and is treated as expired rather than living forever.\n\n**3. `requireAuth` compared a property that doesn't exist on the row** (`src/middleware/auth.ts:11`) \u2014 it passed the raw `SELECT *` row straight into `isExpired`, but the driver returns snake_case `expires_at`, not `expiresAt`. Reading `.expiresAt` off that row yields `undefined`, so even with #1 and #2 fixed, auth would still never expire anything. Added `toSession()` to map the row (and parse the timestamp, which the driver may hand back as a string), and `requireAuth` now maps before checking.\n\n**Schema gap:** `sessions` had neither column \u2014 just `id` and `created_at`. The existing INSERT referenced `user_id`, which would have errored against a real database. Added `user_id uuid not null references users (id)` and `expires_at timestamptz not null` (`src/db/schema.sql:2`).\n\n**Verification:** added `src/lib/__tests__/session.test.ts` (vitest, beside the source, per your conventions) covering past-expiry, within-expiry, null-expiry, and the snake_case/string-timestamp mapping. All 4 pass via `pnpm test`.\n\nTwo things to flag:\n\n- **Existing sessions will be logged out.** Rows written before this fix have no expiry, and change #2 now treats those as expired. That's the correct security posture, but it's a one-time forced re-login. If you'd rather backfill instead, run an `UPDATE sessions SET expires_at = created_at + interval '1 day'` before deploying.\n- **The schema change needs a real migration.** I edited `schema.sql` in place since the repo has no migrations directory. Against an existing database, `expires_at timestamptz not null` will fail on rows that already exist \u2014 you'll need to add it nullable, backfill, then set NOT NULL.\n\nSetup note: the repo had no test tooling, so I added `vitest` and a `test` script. A clean `pnpm install` doesn't pull vitest 5's `rolldown` native binding on this machine (a known pnpm optional-dependency issue), so I pinned `@rolldown/binding-darwin-arm64` under `optionalDependencies` \u2014 it declares `os: darwin, cpu: arm64`, so other platforms skip it rather than failing. Drop it if your CI resolves optionals correctly.\n\nI didn't commit anything \u2014 this working directory is entirely untracked, so `git diff` is empty and the changes are on disk only.",
+ "ttft_ms": 1652,
+ "type": "result",
+ "duration_ms": 131224,
+ "uuid": "3e108344-484f-4e3b-8c28-691abf6004d2",
+ "ttft_stream_ms": 894,
+ "time_to_request_ms": 35,
+ "first_content_frame_ms": 894,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "bloated-md",
+  "rep": 1,
+  "wall_s": 134
+ }
+}

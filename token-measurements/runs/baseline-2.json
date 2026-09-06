@@ -1,0 +1,115 @@
+{
+ "duration_api_ms": 77492,
+ "stop_reason": "end_turn",
+ "session_id": "2bab0f4b-6ac0-42aa-8e68-fb94f065eb94",
+ "total_cost_usd": 0.6823720000000001,
+ "usage": {
+  "input_tokens": 26,
+  "cache_creation_input_tokens": 31841,
+  "cache_read_input_tokens": 443392,
+  "output_tokens": 5647,
+  "output_tokens_details": {
+   "thinking_tokens": 1408
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 31841,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 851,
+    "cache_read_input_tokens": 41624,
+    "cache_creation_input_tokens": 227,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 227
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-haiku-4-5-20251001": {
+   "inputTokens": 906,
+   "outputTokens": 11,
+   "cacheReadInputTokens": 0,
+   "cacheCreationInputTokens": 0,
+   "webSearchRequests": 0,
+   "costUSD": 0.000961,
+   "contextWindow": 200000,
+   "maxOutputTokens": 32000,
+   "thinkingTokens": 0,
+   "canonicalModel": "claude-haiku-4-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  },
+  "claude-opus-5[1m]": {
+   "inputTokens": 26,
+   "outputTokens": 5647,
+   "cacheReadInputTokens": 443392,
+   "cacheCreationInputTokens": 31841,
+   "webSearchRequests": 0,
+   "costUSD": 0.681411,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "thinkingTokens": 1408,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "is_error": false,
+ "num_turns": 13,
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "Fixed. The cause was three linked defects \u2014 fixing only the first would have left sessions immortal anyway.\n\n**1. Expiry was never written** \u2014 `src/lib/session.ts:10`\n\n`createSession` inserted only `(id, user_id)` and returned `expiresAt: null`. Now it computes `defaultExpiry()` (24h), persists it, and returns it.\n\n**2. The auth check read the wrong field** \u2014 `src/middleware/auth.ts:11`\n\n`requireAuth` passed a raw Postgres row straight into `isExpired`. The row has `expires_at`; `isExpired` reads `expiresAt`, which is always `undefined` on a raw row. So even with the column populated, every session would still have passed. Added a `rowToSession` mapper that converts snake_case \u2192 camelCase and parses the timestamp into a `Date`.\n\n**3. `isExpired` failed open** \u2014 `src/lib/session.ts:22`\n\n`if (!s.expiresAt) return false` meant \"no expiry recorded\" was treated as \"valid forever\". Flipped to `return true` \u2014 an auth check should fail closed.\n\n**4. The column didn't exist** \u2014 `src/db/schema.sql:2`\n\n`CREATE TABLE sessions` had only `id` and `created_at`; the original `INSERT` referenced a `user_id` that was never declared. Added `user_id uuid not null references users(id)` and `expires_at timestamptz not null`.\n\n**Verification:** the fixture has no test runner, compiler, or dependencies (`package.json` is bare), so I couldn't typecheck or run its suite. I exercised a faithful port of the three function bodies against six cases \u2014 expiry persisted as a `Date` in the insert params, fresh session valid, 24h horizon, past-dated snake_case row rejected, future-dated row accepted, null expiry rejected. All passed.\n\nTwo things worth your call:\n\n- **Existing rows will be logged out.** The schema change makes `expires_at NOT NULL`, and fail-closed `isExpired` rejects any row with a null expiry. If this fixture ever maps to a real database, you need a migration that backfills `expires_at` on live sessions before adding the constraint, rather than the `CREATE TABLE` edit I made.\n- **24h is inherited, not chosen.** `defaultExpiry()` already existed with `DAY` but was dead code \u2014 nothing called it. I wired it up as-is. There's also no refresh/sliding-window logic, so users get hard-logged-out daily mid-session; if that's not the intent, session renewal is a separate piece of work I didn't add.",
+ "ttft_ms": 1689,
+ "type": "result",
+ "duration_ms": 79818,
+ "uuid": "a528f554-1c07-4151-9b8e-1153575c2432",
+ "ttft_stream_ms": 881,
+ "time_to_request_ms": 41,
+ "first_content_frame_ms": 887,
+ "queued_turn_count": 0,
+ "_meta": {
+  "condition": "baseline",
+  "rep": 2,
+  "wall_s": 84
+ }
+}

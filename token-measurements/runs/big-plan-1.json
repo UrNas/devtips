@@ -1,0 +1,18 @@
+{
+ "usage": {
+  "input_tokens": 26,
+  "cache_creation_input_tokens": 70288,
+  "cache_read_input_tokens": 489769,
+  "output_tokens": 15470
+ },
+ "num_turns": 15,
+ "total_cost_usd": 1.3356305,
+ "_meta": {
+  "condition": "big-plan",
+  "rep": 1,
+  "wall_s": 219,
+  "two_turn": true,
+  "turn1_cost": 0.39636000000000005,
+  "turn2_cost": 0.9392704999999999
+ }
+}
